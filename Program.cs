@@ -1,17 +1,21 @@
 ﻿using System;
 using System.IO;
 using System.Linq;
-using System.Threading;
 
 var room = (await File.ReadAllLinesAsync("data.txt")).Select(c => c.ToArray()).ToArray();
 var lines = room.Length;
 var chars = room[0].Length;
 var printableRoom = room.ToPrintableString();
+var part2Logic = new Func<int, int, int, LocationState>[] {
+    CheckNW, CheckN, CheckNE,
+    CheckW,          CheckE,
+    CheckSW, CheckS, CheckSE,
+};
 
 while (true)
 {
-    // Console.WriteLine();
-    // Console.WriteLine(printableRoom);
+    Console.WriteLine();
+    Console.WriteLine(printableRoom);
     var next = ApplyRules();
     var nextPrint = next.ToPrintableString();
     if (nextPrint == printableRoom)
@@ -46,30 +50,36 @@ char GetSeatState(int lineIndex, int charIndex)
     var current = room[lineIndex][charIndex];
     if (current == '.') return '.';
 
-    var occupiedSeatsAroundIt = 0;
-    if (lineIndex > 0)
+    var range = 1;
+    var positionStates = new[] {
+        LocationState.Unknown, LocationState.Unknown, LocationState.Unknown,
+        LocationState.Unknown,                        LocationState.Unknown,
+        LocationState.Unknown, LocationState.Unknown, LocationState.Unknown,
+    };
+
+    while (true)
     {
-        occupiedSeatsAroundIt += charIndex > 0 && room[lineIndex - 1][charIndex - 1] == '#' ? 1 : 0;
-        occupiedSeatsAroundIt += room[lineIndex - 1][charIndex] == '#' ? 1 : 0;
-        occupiedSeatsAroundIt += charIndex < chars - 1 && room[lineIndex - 1][charIndex + 1] == '#' ? 1 : 0;
+        if (positionStates.All(p => p == LocationState.EmptySeat || p == LocationState.OccupiedSeat || p == LocationState.StopInstruction))
+        {
+            break;
+        }
+
+        for (var index = 0; index < 8; index++)
+        {
+            if (positionStates[index] == LocationState.Floor || positionStates[index] == LocationState.Unknown) positionStates[index] = part2Logic[index](lineIndex, charIndex, range);
+        }
+        
+        range++;
     }
 
-    occupiedSeatsAroundIt += charIndex > 0 && room[lineIndex][charIndex - 1] == '#' ? 1 : 0;
-    occupiedSeatsAroundIt += charIndex < chars - 1 && room[lineIndex][charIndex + 1] == '#' ? 1 : 0;
-
-    if (lineIndex < lines - 1)
-    {
-        occupiedSeatsAroundIt += charIndex > 0 && room[lineIndex + 1][charIndex - 1] == '#' ? 1 : 0;
-        occupiedSeatsAroundIt += room[lineIndex + 1][charIndex] == '#' ? 1 : 0;
-        occupiedSeatsAroundIt += charIndex < chars - 1 && room[lineIndex + 1][charIndex + 1] == '#' ? 1 : 0;
-    }
+    var occupiedSeatsAroundIt = positionStates.Where(p => p == LocationState.OccupiedSeat).Count();
 
     if (current == 'L' && occupiedSeatsAroundIt == 0)
     {
         return '#';
     }
 
-    if (current == '#' && occupiedSeatsAroundIt >= 4)
+    if (current == '#' && occupiedSeatsAroundIt >= 5)
     {
         return 'L';
     }
@@ -77,10 +87,82 @@ char GetSeatState(int lineIndex, int charIndex)
     return current;
 }
 
-public static class ExtensionMethods
+LocationState CheckNW(int lineIndex, int charIndex, int range)
 {
-    public static string ToPrintableString(this char[][] input)
+    if (charIndex - range < 0 || lineIndex - range < 0)
     {
-        return input.Aggregate("", (currLine, nextLine) => currLine += Environment.NewLine + new string(nextLine));
+        return LocationState.StopInstruction;
     }
+
+    return room[lineIndex - range][charIndex - range].ToLocationState();
+}
+
+LocationState CheckN(int lineIndex, int charIndex, int range)
+{
+    if (lineIndex - range < 0)
+    {
+        return LocationState.StopInstruction;
+    }
+
+    return room[lineIndex - range][charIndex].ToLocationState();
+}
+
+LocationState CheckNE(int lineIndex, int charIndex, int range)
+{
+    if (charIndex + range >= chars || lineIndex - range < 0)
+    {
+        return LocationState.StopInstruction;
+    }
+
+    return room[lineIndex - range][charIndex + range].ToLocationState();
+}
+
+LocationState CheckW(int lineIndex, int charIndex, int range)
+{
+    if (charIndex - range < 0)
+    {
+        return LocationState.StopInstruction;
+    }
+
+    return room[lineIndex][charIndex - range].ToLocationState();
+}
+
+LocationState CheckE(int lineIndex, int charIndex, int range)
+{
+    if (charIndex + range >= chars)
+    {
+        return LocationState.StopInstruction;
+    }
+
+    return room[lineIndex][charIndex + range].ToLocationState();
+}
+
+LocationState CheckSW(int lineIndex, int charIndex, int range)
+{
+    if (charIndex - range < 0 || lineIndex + range >= lines)
+    {
+        return LocationState.StopInstruction;
+    }
+
+    return room[lineIndex + range][charIndex - range].ToLocationState();
+}
+
+LocationState CheckS(int lineIndex, int charIndex, int range)
+{
+    if (lineIndex + range >= lines)
+    {
+        return LocationState.StopInstruction;
+    }
+
+    return room[lineIndex + range][charIndex].ToLocationState();
+}
+
+LocationState CheckSE(int lineIndex, int charIndex, int range)
+{
+    if (charIndex + range >= chars || lineIndex + range >= lines)
+    {
+        return LocationState.StopInstruction;
+    }
+
+    return room[lineIndex + range][charIndex + range].ToLocationState();
 }
